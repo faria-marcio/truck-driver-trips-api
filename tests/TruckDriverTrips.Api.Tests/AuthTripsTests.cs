@@ -34,6 +34,29 @@ public sealed class AuthTripsTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Register_DuplicateEmail_ReturnsConflict()
+    {
+        var client = _factory.CreateClient();
+        var request = new { email = "duplicate@example.com", password = "Passw0rd1", name = "Driver One" };
+
+        var first = await client.PostAsJsonAsync("/api/auth/register", request);
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+
+        var second = await client.PostAsJsonAsync("/api/auth/register", request);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_InvalidPassword_ReturnsUnauthorized()
+    {
+        var client = _factory.CreateClient();
+        await client.PostAsJsonAsync("/api/auth/register", new { email = "invalid-login@example.com", password = "Passw0rd1", name = "Driver One" });
+
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email = "invalid-login@example.com", password = "WrongPass123" });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Driver_CanOnlySeeOwnTrips()
     {
         var client = _factory.CreateClient();
@@ -107,6 +130,26 @@ public sealed class AuthTripsTests : IClassFixture<ApiFactory>
 
         var adminDelete = await SendAuthorizedAsync(client, HttpMethod.Delete, $"/api/trips/{tripId}", admin.Token);
         Assert.Equal(HttpStatusCode.NoContent, adminDelete.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateTrip_WithInvalidTimeWindow_ReturnsBadRequest()
+    {
+        var client = _factory.CreateClient();
+        var user = await RegisterAndLoginAsync(client, "invalid-time@example.com", "Passw0rd1", "Driver");
+
+        var payload = new
+        {
+            date = "2026-08-20",
+            startTime = "12:00:00",
+            endTime = "11:00:00",
+            distanceKm = 10.5m,
+            pickupLocation = "A",
+            dropoffLocation = "B"
+        };
+
+        var response = await SendAuthorizedAsync(client, HttpMethod.Post, "/api/trips", user.Token, payload);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     private static async Task<(string Token, string UserId)> RegisterAndLoginAsync(HttpClient client, string email, string password, string name)
