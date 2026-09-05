@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -11,7 +12,7 @@ namespace TruckDriverTrips.Api.Tests;
 
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
-    private readonly string _databaseName = $"TruckTripsTests-{Guid.NewGuid()}";
+    private readonly SqliteConnection _connection = new("DataSource=:memory:");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -25,9 +26,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.Remove(dbOptionsDescriptor);
             }
 
+            _connection.Open();
             services.AddDbContext<ApplicationDbContext>(options =>
             {
-                options.UseInMemoryDatabase(_databaseName);
+                options.UseSqlite(_connection);
             });
         });
     }
@@ -38,5 +40,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByIdAsync(userId) ?? throw new InvalidOperationException("User not found.");
         await userManager.AddToRoleAsync(user, IdentitySeed.AdminRole);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            _connection.Dispose();
+        }
     }
 }

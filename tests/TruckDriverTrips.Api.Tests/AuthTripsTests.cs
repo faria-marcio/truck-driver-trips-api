@@ -74,6 +74,41 @@ public sealed class AuthTripsTests : IClassFixture<ApiFactory>
         Assert.Contains(trips, x => x!["driverId"]!.GetValue<string>() == driver.UserId);
     }
 
+    [Fact]
+    public async Task Ownership_IsEnforced_ForUpdateAndDelete_WithAdminOverride()
+    {
+        var client = _factory.CreateClient();
+
+        var owner = await RegisterAndLoginAsync(client, "owner@example.com", "Passw0rd1", "Owner");
+        var otherDriver = await RegisterAndLoginAsync(client, "other@example.com", "Passw0rd1", "Other");
+        var admin = await RegisterAndLoginAsync(client, "admin2@example.com", "Passw0rd1", "Admin 2");
+        await _factory.PromoteToAdminAsync(admin.UserId);
+        admin = await LoginAsync(client, "admin2@example.com", "Passw0rd1");
+
+        var tripId = await CreateTripAsync(client, owner.Token, "Start", "End");
+        var updatePayload = new
+        {
+            date = "2026-08-21",
+            startTime = "10:00:00",
+            endTime = "11:00:00",
+            distanceKm = 25.1m,
+            pickupLocation = "Updated Start",
+            dropoffLocation = "Updated End"
+        };
+
+        var otherUpdate = await SendAuthorizedAsync(client, HttpMethod.Put, $"/api/trips/{tripId}", otherDriver.Token, updatePayload);
+        Assert.Equal(HttpStatusCode.NotFound, otherUpdate.StatusCode);
+
+        var adminUpdate = await SendAuthorizedAsync(client, HttpMethod.Put, $"/api/trips/{tripId}", admin.Token, updatePayload);
+        Assert.Equal(HttpStatusCode.OK, adminUpdate.StatusCode);
+
+        var otherDelete = await SendAuthorizedAsync(client, HttpMethod.Delete, $"/api/trips/{tripId}", otherDriver.Token);
+        Assert.Equal(HttpStatusCode.NotFound, otherDelete.StatusCode);
+
+        var adminDelete = await SendAuthorizedAsync(client, HttpMethod.Delete, $"/api/trips/{tripId}", admin.Token);
+        Assert.Equal(HttpStatusCode.NoContent, adminDelete.StatusCode);
+    }
+
     private static async Task<(string Token, string UserId)> RegisterAndLoginAsync(HttpClient client, string email, string password, string name)
     {
         await client.PostAsJsonAsync("/api/auth/register", new { email, password, name });

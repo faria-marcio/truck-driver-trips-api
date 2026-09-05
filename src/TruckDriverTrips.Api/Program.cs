@@ -91,7 +91,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.MigrateAsync();
 }
 
 await IdentitySeed.EnsureRolesAsync(app.Services);

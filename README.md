@@ -52,7 +52,7 @@ The app uses SQLite with `Data Source=truck-driver-trips.db` by default.
 
 ## Database and migrations
 
-This MVP creates the database schema at startup using EF Core model metadata (`EnsureCreated`) for minimal local setup.
+This MVP includes an initial EF Core migration and applies pending migrations on startup (`Database.Migrate()`), so local setup stays simple while keeping a migration-based workflow.
 
 If you want migration-based flow:
 
