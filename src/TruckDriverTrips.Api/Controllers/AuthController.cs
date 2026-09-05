@@ -61,7 +61,16 @@ public sealed class AuthController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        await _userManager.AddToRoleAsync(user, IdentitySeed.DriverRole);
+        var roleResult = await _userManager.AddToRoleAsync(user, IdentitySeed.DriverRole);
+        if (!roleResult.Succeeded)
+        {
+            foreach (var error in roleResult.Errors)
+            {
+                ModelState.AddModelError(error.Code, error.Description);
+            }
+
+            return ValidationProblem(ModelState);
+        }
 
         var token = _jwtTokenService.CreateToken(user, IdentitySeed.DriverRole);
         var response = new AuthResponse(token, new AuthUserResponse(user.Id, user.Email ?? string.Empty, user.Name, IdentitySeed.DriverRole));
