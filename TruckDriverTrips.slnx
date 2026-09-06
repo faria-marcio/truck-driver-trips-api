@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/TruckDriverTrips.Api/TruckDriverTrips.Api.csproj" />
+    <Project Path="src/TruckDriverTrips.AppHost/TruckDriverTrips.AppHost.csproj" />
+    <Project Path="src/TruckDriverTrips.ServiceDefaults/TruckDriverTrips.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TruckDriverTrips.Api.Tests/TruckDriverTrips.Api.Tests.csproj" />
