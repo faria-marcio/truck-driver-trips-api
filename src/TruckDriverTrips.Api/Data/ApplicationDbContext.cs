@@ -27,12 +27,23 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
         builder.Entity<Trip>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.DistanceKm).HasPrecision(10, 2);
+            entity.Property(x => x.TruckId).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.StartKm).HasPrecision(12, 2);
+            entity.Property(x => x.EndKm).HasPrecision(12, 2);
+            entity.Property(x => x.DistanceKm).HasPrecision(12, 2);
             entity.Property(x => x.PickupLocation).HasMaxLength(250).IsRequired();
             entity.Property(x => x.DropoffLocation).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.CommissionAmount).HasPrecision(12, 2);
+            entity.Property(x => x.BolNumber).HasMaxLength(100);
+            entity.Property(x => x.FuelCostAmount).HasPrecision(12, 2);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
             entity.Property(x => x.DriverId).IsRequired();
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.Property(x => x.Version)
+                .IsRequired()
+                .IsConcurrencyToken()
+                .HasDefaultValue(1);
 
             entity.HasOne(x => x.Driver)
                 .WithMany()
@@ -40,6 +51,8 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(x => new { x.DriverId, x.Date });
+            entity.HasIndex(x => new { x.DriverId, x.TruckId, x.Date });
+            entity.HasIndex(x => new { x.TruckId, x.Date });
         });
     }
 
@@ -65,10 +78,12 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
             {
                 entry.Entity.CreatedAtUtc = utcNow;
                 entry.Entity.UpdatedAtUtc = utcNow;
+                entry.Entity.Version = 1;
             }
             else if (entry.State == EntityState.Modified)
             {
                 entry.Entity.UpdatedAtUtc = utcNow;
+                entry.Entity.Version = entry.OriginalValues.GetValue<int>(nameof(Trip.Version)) + 1;
             }
         }
     }
