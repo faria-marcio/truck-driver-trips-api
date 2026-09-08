@@ -90,10 +90,17 @@ stale state; do not use destructive `aspire stop --force` cleanup unless data lo
 
 ## Database and migrations
 
-The existing initial migration was generated for SQLite. Standalone SQLite runs apply it with
-`Database.Migrate()`. Aspire PostgreSQL development databases use `EnsureCreated()` from the
-provider model instead, avoiding SQLite-specific store types and annotations. Generate and test
-a provider-specific migration before introducing PostgreSQL schema evolution beyond development.
+The existing initial migration and `UpdateTripContract` migration are generated for SQLite.
+Standalone SQLite runs apply them with `Database.Migrate()`. The contract migration preserves
+legacy distances by using the old distance as `endKm` with a `startKm` of zero, and assigns
+`unknown` to the newly required `truckId` for legacy rows.
+
+Aspire PostgreSQL development databases use `EnsureCreated()` from the provider model instead,
+avoiding SQLite-specific store types and annotations. A fresh Aspire database gets the current
+schema; an existing development database must be recreated or otherwise reset when applying this
+contract change because Aspire is intentionally not using the SQLite migration chain. Generate
+and test a provider-specific migration before introducing PostgreSQL schema evolution beyond
+development.
 
 If you want migration-based flow:
 
@@ -126,21 +133,42 @@ absent, the API uses the SQLite `DefaultConnection` fallback.
 - `GET /api/trips`
   - Driver: only own trips.
   - Admin: all trips.
+  - Optional query filters: `from`, `to`, `truckId`, `page`, and `pageSize`.
+  - The response remains a JSON array for compatibility with existing clients. Pagination is
+    applied when either `page` or `pageSize` is supplied; defaults are page `1` and page size `50`.
+- `GET /api/trips/summary`
+  - Uses the same authorized scope and `from`, `to`, and `truckId` filters.
+  - Returns `count`, `totalDistanceKm`, `totalCommissionAmount`, and weighted
+    `commissionPerKm` (`totalCommissionAmount / totalDistanceKm`, or `0` when distance is zero).
 - `POST /api/trips`
-  - Creates trip owned by authenticated driver.
+  - Creates a trip owned by the authenticated driver.
 - `GET /api/trips/{id}` / `PUT /api/trips/{id}` / `DELETE /api/trips/{id}`
   - Allowed for owner or admin only.
-  - Returns `404` when trip is not accessible.
+  - Returns `404` when a trip is not accessible.
 
-Trip fields:
+Create and update payload:
 
-- `date` (`DateOnly`)
-- `startTime` (`TimeOnly`)
-- `endTime` (`TimeOnly`, must be greater than `startTime`)
-- `distanceKm` (> 0)
-- `pickupLocation`
-- `dropoffLocation`
-- server-managed `driverId`, `createdAtUtc`, `updatedAtUtc`
+```json
+{
+  "date": "2026-08-20",
+  "truckId": "TRUCK-001",
+  "startKm": 100.0,
+  "endKm": 125.0,
+  "pickupLocation": "A",
+  "dropoffLocation": "B",
+  "commissionAmount": 125.0,
+  "bolNumber": "BOL-001",
+  "fuelCostAmount": 30.0,
+  "waitTimeMinutes": 15,
+  "notes": "Optional notes"
+}
+```
+
+`endKm` must be greater than `startKm`. `distanceKm` is always derived by the server as
+`endKm - startKm`; clients cannot set it. `bolNumber` and `notes` are optional. Responses also
+include the server-managed `id`, `driverId`, `createdAtUtc`, `updatedAtUtc`, and integer `version`.
+The previous `startTime`, `endTime`, and client-provided `distanceKm` fields are intentionally
+removed from the contract.
 
 ## Frontend integration
 

@@ -1,6 +1,71 @@
 @TruckDriverTrips.Api_HostAddress = http://localhost:5010
 
-GET {{TruckDriverTrips.Api_HostAddress}}/weatherforecast/
+@token = replace-with-jwt
+@tripId = replace-with-trip-id
+
+### List trips with optional filters and pagination
+GET {{TruckDriverTrips.Api_HostAddress}}/api/trips?from=2026-08-01&to=2026-08-31&truckId=TRUCK-001&page=1&pageSize=25
+Authorization: Bearer {{token}}
 Accept: application/json
 
 ###
+
+### Get the authorized trip summary
+GET {{TruckDriverTrips.Api_HostAddress}}/api/trips/summary?from=2026-08-01&to=2026-08-31&truckId=TRUCK-001
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Create a trip
+POST {{TruckDriverTrips.Api_HostAddress}}/api/trips
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "date": "2026-08-20",
+  "truckId": "TRUCK-001",
+  "startKm": 100.0,
+  "endKm": 125.0,
+  "pickupLocation": "A",
+  "dropoffLocation": "B",
+  "commissionAmount": 125.0,
+  "bolNumber": "BOL-001",
+  "fuelCostAmount": 30.0,
+  "waitTimeMinutes": 15,
+  "notes": "Optional notes"
+}
+
+###
+
+### Get one trip
+GET {{TruckDriverTrips.Api_HostAddress}}/api/trips/{{tripId}}
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Replace one trip
+PUT {{TruckDriverTrips.Api_HostAddress}}/api/trips/{{tripId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "date": "2026-08-21",
+  "truckId": "TRUCK-001",
+  "startKm": 125.0,
+  "endKm": 150.0,
+  "pickupLocation": "B",
+  "dropoffLocation": "C",
+  "commissionAmount": 150.0,
+  "bolNumber": "BOL-002",
+  "fuelCostAmount": 35.0,
+  "waitTimeMinutes": 0,
+  "notes": "Updated notes"
+}
+
+###
+
+### Delete one trip
+DELETE {{TruckDriverTrips.Api_HostAddress}}/api/trips/{{tripId}}
+Authorization: Bearer {{token}}
