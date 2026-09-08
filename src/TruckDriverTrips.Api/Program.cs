@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
 using TruckDriverTrips.Api.Data;
 using TruckDriverTrips.Api.Infrastructure;
 using TruckDriverTrips.Api.Models;
@@ -20,6 +21,8 @@ builder.Services
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services.Configure<GeoapifyOptions>(
+    builder.Configuration.GetSection(GeoapifyOptions.SectionName));
 
 var usesAspirePostgres = builder.Configuration.GetConnectionString("tripsdb") is not null;
 
@@ -72,6 +75,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddMemoryCache();
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
@@ -93,9 +97,14 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<ITripService, TripService>();
+builder.Services.AddHttpClient<ICitySearchService, GeoapifyCitySearchService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.geoapify.com/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckDriverTrips/1.0");
+});
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
@@ -118,8 +127,8 @@ app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 if (!app.Environment.IsEnvironment("Testing"))

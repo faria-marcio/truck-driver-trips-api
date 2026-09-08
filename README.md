@@ -9,7 +9,7 @@ ASP.NET Core 10 REST API backend for truck-driver trip logging.
 - Trip CRUD with strict ownership rules in backend
 - Consistent error responses using `ProblemDetails`
 - EF Core + SQLite standalone, with Aspire-managed PostgreSQL for development
-- Swagger/OpenAPI in development
+- Scalar API reference and OpenAPI document in development
 
 ## Prerequisites
 
@@ -35,6 +35,7 @@ Use environment variables in non-local environments:
 - `Jwt__Issuer`
 - `Jwt__Audience`
 - `Jwt__AccessTokenMinutes`
+- `Geoapify__ApiKey` for Brazilian city search and truck-route distance estimates
 
 For local Aspire runs, set the secret AppHost parameters `jwt-key` and `nextauth-secret` through
 Aspire/AppHost user secrets. They are intentionally not committed to `appsettings.json`.
@@ -43,6 +44,7 @@ For example:
 ```bash
 dotnet user-secrets --project src/TruckDriverTrips.AppHost set Parameters:jwt-key "$(openssl rand -base64 48)"
 dotnet user-secrets --project src/TruckDriverTrips.AppHost set Parameters:nextauth-secret "$(openssl rand -base64 48)"
+dotnet user-secrets --project src/TruckDriverTrips.AppHost set Parameters:geoapify-api-key "your-geoapify-api-key"
 ```
 
 ### CORS configuration
@@ -140,6 +142,10 @@ absent, the API uses the SQLite `DefaultConnection` fallback.
   - Uses the same authorized scope and `from`, `to`, and `truckId` filters.
   - Returns `count`, `totalDistanceKm`, `totalCommissionAmount`, and weighted
     `commissionPerKm` (`totalCommissionAmount / totalDistanceKm`, or `0` when distance is zero).
+- `GET /api/locations/cities?query={query}`
+  - Uses Geoapify Autocomplete to search Brazilian cities. Requires at least two query characters.
+- `POST /api/locations/route`
+  - Calculates an estimated driving-route distance from selected city coordinates.
 - `POST /api/trips`
   - Creates a trip owned by the authenticated driver.
 - `GET /api/trips/{id}` / `PUT /api/trips/{id}` / `DELETE /api/trips/{id}`

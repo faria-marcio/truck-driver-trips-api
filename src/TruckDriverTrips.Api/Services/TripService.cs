@@ -6,21 +6,12 @@ using TruckDriverTrips.Api.Models;
 
 namespace TruckDriverTrips.Api.Services;
 
-public sealed class TripService : ITripService
+public sealed class TripService(ApplicationDbContext dbContext) : ITripService
 {
     private const int DefaultPageSize = 50;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly ApplicationDbContext _dbContext = dbContext;
 
-    public TripService(ApplicationDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    public async Task<IReadOnlyList<TripResponse>> GetTripsAsync(
-        TripQueryRequest query,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TripResponse>> GetTripsAsync(TripQueryRequest query, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         IQueryable<Trip> tripsQuery = BuildAuthorizedQuery(query, currentUserId, isAdmin)
             .OrderByDescending(x => x.Date)
@@ -41,11 +32,7 @@ public sealed class TripService : ITripService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TripResponse?> GetTripAsync(
-        Guid id,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<TripResponse?> GetTripAsync(Guid id, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var trip = await BuildAuthorizedQuery(
                 new TripQueryRequest(),
@@ -56,10 +43,7 @@ public sealed class TripService : ITripService
         return trip is null ? null : ToResponse(trip);
     }
 
-    public async Task<TripResponse> CreateTripAsync(
-        TripUpsertRequest request,
-        string currentUserId,
-        CancellationToken cancellationToken)
+    public async Task<TripResponse> CreateTripAsync(TripUpsertRequest request, string currentUserId, CancellationToken cancellationToken)
     {
         var trip = new Trip
         {
@@ -74,12 +58,7 @@ public sealed class TripService : ITripService
         return ToResponse(trip);
     }
 
-    public async Task<TripResponse?> UpdateTripAsync(
-        Guid id,
-        TripUpsertRequest request,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<TripResponse?> UpdateTripAsync(Guid id, TripUpsertRequest request, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var trip = await BuildAuthorizedQuery(
                 new TripQueryRequest(),
@@ -99,11 +78,7 @@ public sealed class TripService : ITripService
         return ToResponse(trip);
     }
 
-    public async Task<bool> DeleteTripAsync(
-        Guid id,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<bool> DeleteTripAsync(Guid id, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var trip = await BuildAuthorizedQuery(
                 new TripQueryRequest(),
@@ -122,11 +97,7 @@ public sealed class TripService : ITripService
         return true;
     }
 
-    public async Task<TripSummaryResponse> GetSummaryAsync(
-        TripQueryRequest query,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<TripSummaryResponse> GetSummaryAsync(TripQueryRequest query, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var aggregate = await BuildAuthorizedQuery(query, currentUserId, isAdmin)
             .GroupBy(_ => 1)
@@ -154,11 +125,7 @@ public sealed class TripService : ITripService
             commissionPerKm);
     }
 
-    private IQueryable<Trip> BuildAuthorizedQuery(
-        TripQueryRequest query,
-        string currentUserId,
-        bool isAdmin,
-        bool trackEntities = false)
+    private IQueryable<Trip> BuildAuthorizedQuery(TripQueryRequest query, string currentUserId, bool isAdmin, bool trackEntities = false)
     {
         IQueryable<Trip> trips = _dbContext.Trips;
         if (!trackEntities)
