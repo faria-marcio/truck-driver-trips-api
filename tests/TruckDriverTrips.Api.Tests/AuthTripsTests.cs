@@ -109,6 +109,7 @@ public sealed class AuthTripsTests : IClassFixture<ApiFactory>
         admin = await LoginAsync(client, "admin2@example.com", "Passw0rd1");
 
         var tripId = await CreateTripAsync(client, owner.Token, "Start", "End");
+        await _factory.EnsureActiveTruckAsync("TRUCK-UPDATED");
         var updatePayload = TripPayload(
             "Updated Start",
             "Updated End",
@@ -151,6 +152,7 @@ public sealed class AuthTripsTests : IClassFixture<ApiFactory>
     {
         var client = _factory.CreateClient();
         var user = await RegisterAndLoginAsync(client, "derived-distance@example.com", "Passw0rd1", "Driver");
+        await _factory.EnsureActiveTruckAsync("TRUCK-DERIVED");
 
         var payload = new
         {
@@ -255,7 +257,7 @@ public sealed class AuthTripsTests : IClassFixture<ApiFactory>
         return (payload["token"]!.GetValue<string>(), payload["user"]!["id"]!.GetValue<string>());
     }
 
-    private static async Task<Guid> CreateTripAsync(
+    private async Task<Guid> CreateTripAsync(
         HttpClient client,
         string token,
         string pickup,
@@ -266,6 +268,7 @@ public sealed class AuthTripsTests : IClassFixture<ApiFactory>
         decimal endKm = 112.5m,
         decimal commissionAmount = 125)
     {
+        await _factory.EnsureActiveTruckAsync(truckId);
         var response = await SendAuthorizedAsync(
             client,
             HttpMethod.Post,

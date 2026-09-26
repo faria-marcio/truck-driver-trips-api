@@ -8,8 +8,8 @@ public sealed record TripUpsertRequest
     [Required]
     public DateOnly? Date { get; init; }
 
-    [Required, MaxLength(100)]
-    public string TruckId { get; init; } = string.Empty;
+    [MaxLength(100)]
+    public string? TruckId { get; init; }
 
     [Range(0, double.MaxValue)]
     public decimal StartKm { get; init; }

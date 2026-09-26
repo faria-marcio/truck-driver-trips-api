@@ -1,30 +1,70 @@
 @TruckDriverTrips.Api_HostAddress = http://localhost:5010
 
-@token = replace-with-jwt
+@adminToken = replace-with-admin-jwt
+@driverToken = replace-with-driver-jwt
+@driverId = replace-with-driver-id
+@truckId = replace-with-truck-id
 @tripId = replace-with-trip-id
+
+### List active trucks
+GET {{TruckDriverTrips.Api_HostAddress}}/api/trucks
+Authorization: Bearer {{driverToken}}
+Accept: application/json
+
+###
+
+### Create a truck (admin)
+POST {{TruckDriverTrips.Api_HostAddress}}/api/trucks
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "registrationNumber": "TRUCK-001",
+  "make": "Volvo",
+  "model": "FH"
+}
+
+###
+
+### Assign a truck to a driver (admin)
+PUT {{TruckDriverTrips.Api_HostAddress}}/api/trucks/assignments/{{driverId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "truckId": "{{truckId}}"
+}
+
+###
+
+### Read the authenticated driver's current truck
+GET {{TruckDriverTrips.Api_HostAddress}}/api/trucks/me
+Authorization: Bearer {{driverToken}}
+Accept: application/json
+
+###
 
 ### List trips with optional filters and pagination
 GET {{TruckDriverTrips.Api_HostAddress}}/api/trips?from=2026-08-01&to=2026-08-31&truckId=TRUCK-001&page=1&pageSize=25
-Authorization: Bearer {{token}}
+Authorization: Bearer {{driverToken}}
 Accept: application/json
 
 ###
 
 ### Get the authorized trip summary
 GET {{TruckDriverTrips.Api_HostAddress}}/api/trips/summary?from=2026-08-01&to=2026-08-31&truckId=TRUCK-001
-Authorization: Bearer {{token}}
+Authorization: Bearer {{driverToken}}
 Accept: application/json
 
 ###
 
-### Create a trip
+### Create a trip (omitted truckId uses the driver's current assignment)
 POST {{TruckDriverTrips.Api_HostAddress}}/api/trips
-Authorization: Bearer {{token}}
+Authorization: Bearer {{driverToken}}
 Content-Type: application/json
 
 {
   "date": "2026-08-20",
-  "truckId": "TRUCK-001",
   "startKm": 100.0,
   "endKm": 125.0,
   "pickupLocation": "A",
@@ -40,19 +80,19 @@ Content-Type: application/json
 
 ### Get one trip
 GET {{TruckDriverTrips.Api_HostAddress}}/api/trips/{{tripId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{driverToken}}
 Accept: application/json
 
 ###
 
 ### Replace one trip
 PUT {{TruckDriverTrips.Api_HostAddress}}/api/trips/{{tripId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{driverToken}}
 Content-Type: application/json
 
 {
   "date": "2026-08-21",
-  "truckId": "TRUCK-001",
+  "truckId": "{{truckId}}",
   "startKm": 125.0,
   "endKm": 150.0,
   "pickupLocation": "B",
@@ -68,4 +108,4 @@ Content-Type: application/json
 
 ### Delete one trip
 DELETE {{TruckDriverTrips.Api_HostAddress}}/api/trips/{{tripId}}
-Authorization: Bearer {{token}}
+Authorization: Bearer {{driverToken}}

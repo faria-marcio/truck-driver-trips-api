@@ -12,6 +12,7 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
     }
 
     public DbSet<Trip> Trips => Set<Trip>();
+    public DbSet<Truck> Trucks => Set<Truck>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -27,7 +28,7 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
         builder.Entity<Trip>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.TruckId).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.TruckId).IsRequired();
             entity.Property(x => x.StartKm).HasPrecision(12, 2);
             entity.Property(x => x.EndKm).HasPrecision(12, 2);
             entity.Property(x => x.DistanceKm).HasPrecision(12, 2);
@@ -50,25 +51,51 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
                 .HasForeignKey(x => x.DriverId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(x => x.Truck)
+                .WithMany(x => x.Trips)
+                .HasForeignKey(x => x.TruckId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasIndex(x => new { x.DriverId, x.Date });
             entity.HasIndex(x => new { x.DriverId, x.TruckId, x.Date });
             entity.HasIndex(x => new { x.TruckId, x.Date });
+        });
+
+        builder.Entity<Truck>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.RegistrationNumber)
+                .HasMaxLength(50)
+                .IsRequired();
+            entity.Property(x => x.Make).HasMaxLength(100);
+            entity.Property(x => x.Model).HasMaxLength(100);
+            entity.Property(x => x.IsActive).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            entity.HasOne(x => x.AssignedDriver)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedDriverId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.RegistrationNumber).IsUnique();
+            entity.HasIndex(x => x.AssignedDriverId).IsUnique();
         });
     }
 
     public override int SaveChanges()
     {
-        ApplyTripTimestamps();
+        ApplyTimestamps();
         return base.SaveChanges();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        ApplyTripTimestamps();
+        ApplyTimestamps();
         return base.SaveChangesAsync(cancellationToken);
     }
 
-    private void ApplyTripTimestamps()
+    private void ApplyTimestamps()
     {
         var utcNow = DateTime.UtcNow;
 
@@ -84,6 +111,19 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
             {
                 entry.Entity.UpdatedAtUtc = utcNow;
                 entry.Entity.Version = entry.OriginalValues.GetValue<int>(nameof(Trip.Version)) + 1;
+            }
+        }
+
+        foreach (var entry in ChangeTracker.Entries<Truck>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.CreatedAtUtc = utcNow;
+                entry.Entity.UpdatedAtUtc = utcNow;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.UpdatedAtUtc = utcNow;
             }
         }
     }

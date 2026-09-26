@@ -97,6 +97,7 @@ public sealed class TripsController : ControllerBase
     [HttpPost]
     [ProducesResponseType<TripResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<TripResponse>> CreateTrip(
         TripUpsertRequest request,
         CancellationToken cancellationToken)
@@ -112,8 +113,19 @@ public sealed class TripsController : ControllerBase
             return Unauthorized();
         }
 
-        var trip = await _tripService.CreateTripAsync(request, currentUserId, cancellationToken);
-        return CreatedAtAction(nameof(GetTrip), new { id = trip.Id }, trip);
+        try
+        {
+            var trip = await _tripService.CreateTripAsync(request, currentUserId, cancellationToken);
+            return CreatedAtAction(nameof(GetTrip), new { id = trip.Id }, trip);
+        }
+        catch (TripValidationException exception)
+        {
+            return BadRequest(CreateBadRequestProblem(exception.Message));
+        }
+        catch (TripConflictException exception)
+        {
+            return Conflict(CreateConflictProblem(exception.Message));
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -147,6 +159,14 @@ public sealed class TripsController : ControllerBase
                 cancellationToken);
 
             return trip is null ? NotFound() : Ok(trip);
+        }
+        catch (TripValidationException exception)
+        {
+            return BadRequest(CreateBadRequestProblem(exception.Message));
+        }
+        catch (TripConflictException exception)
+        {
+            return Conflict(CreateConflictProblem(exception.Message));
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -208,12 +228,6 @@ public sealed class TripsController : ControllerBase
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(request.TruckId))
-        {
-            problemDetails = CreateBadRequestProblem("TruckId is required.");
-            return false;
-        }
-
         if (string.IsNullOrWhiteSpace(request.PickupLocation))
         {
             problemDetails = CreateBadRequestProblem("PickupLocation is required.");
@@ -246,6 +260,13 @@ public sealed class TripsController : ControllerBase
     private static ProblemDetails CreateConflictProblem() => new()
     {
         Title = "The trip was modified by another request.",
+        Status = StatusCodes.Status409Conflict,
+        Type = "https://httpstatuses.com/409"
+    };
+
+    private static ProblemDetails CreateConflictProblem(string title) => new()
+    {
+        Title = title,
         Status = StatusCodes.Status409Conflict,
         Type = "https://httpstatuses.com/409"
     };
