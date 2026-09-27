@@ -3,7 +3,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 var jwtKey = builder.AddParameter("jwt-key", secret: true);
 var nextAuthSecret = builder.AddParameter("nextauth-secret", secret: true);
 var postgres = builder.AddPostgres("postgres")
-    .WithDataVolume();
+    .WithDataVolume()
+    .WithPgAdmin();
 var database = postgres.AddDatabase("tripsdb");
 
 var api = builder.AddProject<Projects.TruckDriverTrips_Api>("api")
