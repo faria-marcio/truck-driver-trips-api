@@ -124,7 +124,6 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Id
             else if (entry.State == EntityState.Modified)
             {
                 entry.Entity.UpdatedAtUtc = utcNow;
-                entry.Entity.Version = entry.OriginalValues.GetValue<int>(nameof(Trip.Version)) + 1;
             }
         }
     }

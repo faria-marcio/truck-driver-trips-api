@@ -5,9 +5,6 @@ namespace TruckDriverTrips.Api.Dtos.Trips;
 public sealed record TripResponse(
     Guid Id,
     DateOnly Date,
-    string TruckId,
-    decimal StartKm,
-    decimal EndKm,
     Guid TruckId,
     string TruckRegistrationNumber,
     decimal StartKm,

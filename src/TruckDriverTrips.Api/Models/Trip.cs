@@ -4,9 +4,6 @@ public sealed class Trip
 {
     public Guid Id { get; set; }
     public DateOnly Date { get; set; }
-    public string TruckId { get; set; } = string.Empty;
-    public decimal StartKm { get; set; }
-    public decimal EndKm { get; set; }
     public Guid TruckId { get; set; }
     public Truck? Truck { get; set; }
     public decimal StartKm { get; set; }

@@ -4,7 +4,7 @@ var jwtKey = builder.AddParameter("jwt-key", secret: true);
 var nextAuthSecret = builder.AddParameter("nextauth-secret", secret: true);
 var geoapifyApiKey = builder.AddParameter("geoapify-api-key", secret: true);
 var postgres = builder.AddPostgres("postgres")
-    .WithDataVolume()
+    //.WithDataVolume()
     .WithPgAdmin();
 var database = postgres.AddDatabase("tripsdb");
 

@@ -102,8 +102,23 @@ this migration.
 
 Aspire PostgreSQL development databases use `EnsureCreated()` from the provider model instead,
 avoiding SQLite-specific migration SQL and annotations. A fresh Aspire database gets the
-current schema; an existing development database must be recreated or otherwise reset when
-the model changes because Aspire is intentionally not using the SQLite migration chain.
+current schema. `EnsureCreated()` does not add tables to a database that already contains
+tables, so an older persistent database can start successfully but fail later with errors such
+as `42P01: relation "Trucks" does not exist`. An existing development database must be
+recreated or otherwise reset when the model changes because Aspire is intentionally not using
+the SQLite migration chain.
+
+To discard and recreate the local Aspire database after confirming its data is no longer
+needed, run these commands from the repository root. `stop --force` permanently deletes this
+AppHost's persistent resources, including PostgreSQL users and trips:
+
+```bash
+aspire stop --force --non-interactive --apphost src/TruckDriverTrips.AppHost/TruckDriverTrips.AppHost.csproj
+aspire start --non-interactive --apphost src/TruckDriverTrips.AppHost/TruckDriverTrips.AppHost.csproj
+```
+
+Do not use this reset if the database contains data that must be retained; the current
+PostgreSQL development setup has no data-preserving migration from earlier schemas.
 
 If you want migration-based flow:
 
