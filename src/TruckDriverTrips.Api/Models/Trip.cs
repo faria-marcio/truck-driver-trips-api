@@ -7,6 +7,10 @@ public sealed class Trip
     public string TruckId { get; set; } = string.Empty;
     public decimal StartKm { get; set; }
     public decimal EndKm { get; set; }
+    public Guid TruckId { get; set; }
+    public Truck? Truck { get; set; }
+    public decimal StartKm { get; set; }
+    public decimal EndKm { get; set; }
     public decimal DistanceKm { get; set; }
     public string PickupLocation { get; set; } = string.Empty;
     public string DropoffLocation { get; set; } = string.Empty;

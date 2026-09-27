@@ -8,7 +8,6 @@ public sealed record TripQueryRequest
     public DateOnly? From { get; init; }
 
     public DateOnly? To { get; init; }
-
     [MaxLength(100)]
     public string? TruckId { get; init; }
 

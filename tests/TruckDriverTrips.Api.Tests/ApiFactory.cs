@@ -43,6 +43,29 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         await userManager.AddToRoleAsync(user, IdentitySeed.AdminRole);
     }
 
+    public async Task<Guid> EnsureActiveTruckAsync(string registrationNumber)
+    {
+        using var scope = Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var normalizedRegistrationNumber = registrationNumber.Trim().ToUpperInvariant();
+        var truck = await dbContext.Trucks
+            .SingleOrDefaultAsync(x => x.RegistrationNumber == normalizedRegistrationNumber);
+
+        if (truck is null)
+        {
+            truck = new Truck
+            {
+                Id = Guid.NewGuid(),
+                RegistrationNumber = normalizedRegistrationNumber,
+                IsActive = true
+            };
+            dbContext.Trucks.Add(truck);
+            await dbContext.SaveChangesAsync();
+        }
+
+        return truck.Id;
+    }
+
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);

@@ -6,6 +6,8 @@ ASP.NET Core 10 REST API backend for truck-driver trip logging.
 
 - JWT authentication with ASP.NET Core Identity password hashing
 - Role-based authorization (`Driver`, `Admin`)
+- Admin-managed trucks with one current driver assignment per truck
+- Driver truck list/current assignment endpoints for trip entry defaults
 - Trip CRUD with strict ownership rules in backend
 - Consistent error responses using `ProblemDetails`
 - EF Core + SQLite standalone, with Aspire-managed PostgreSQL for development
@@ -92,23 +94,20 @@ stale state; do not use destructive `aspire stop --force` cleanup unless data lo
 
 ## Database and migrations
 
-The existing initial migration and `UpdateTripContract` migration are generated for SQLite.
-Standalone SQLite runs apply them with `Database.Migrate()`. The contract migration preserves
-legacy distances by using the old distance as `endKm` with a `startKm` of zero, and assigns
-`unknown` to the newly required `truckId` for legacy rows.
+The migrations are generated for SQLite and standalone runs apply them with
+`Database.Migrate()`. `AddTruckManagement` creates the first-class `Trucks` table and
+recreates `Trips` with a required `Guid` foreign key to `Trucks`. This is an intentional
+destructive POC schema transition; reset/recreate an existing SQLite database when applying
+this migration.
 
 Aspire PostgreSQL development databases use `EnsureCreated()` from the provider model instead,
-avoiding SQLite-specific store types and annotations. A fresh Aspire database gets the current
-schema; an existing development database must be recreated or otherwise reset when applying this
-contract change because Aspire is intentionally not using the SQLite migration chain. Generate
-and test a provider-specific migration before introducing PostgreSQL schema evolution beyond
-development.
+avoiding SQLite-specific migration SQL and annotations. A fresh Aspire database gets the
+current schema; an existing development database must be recreated or otherwise reset when
+the model changes because Aspire is intentionally not using the SQLite migration chain.
 
 If you want migration-based flow:
 
 ```bash
-dotnet tool install --global dotnet-ef
-dotnet ef migrations add InitialCreate --project src/TruckDriverTrips.Api
 dotnet ef database update --project src/TruckDriverTrips.Api
 ```
 
@@ -142,10 +141,6 @@ absent, the API uses the SQLite `DefaultConnection` fallback.
   - Uses the same authorized scope and `from`, `to`, and `truckId` filters.
   - Returns `count`, `totalDistanceKm`, `totalCommissionAmount`, and weighted
     `commissionPerKm` (`totalCommissionAmount / totalDistanceKm`, or `0` when distance is zero).
-- `GET /api/locations/cities?query={query}`
-  - Uses Geoapify Autocomplete to search Brazilian cities. Requires at least two query characters.
-- `POST /api/locations/route`
-  - Calculates an estimated driving-route distance from selected city coordinates.
 - `POST /api/trips`
   - Creates a trip owned by the authenticated driver.
 - `GET /api/trips/{id}` / `PUT /api/trips/{id}` / `DELETE /api/trips/{id}`
@@ -157,7 +152,7 @@ Create and update payload:
 ```json
 {
   "date": "2026-08-20",
-  "truckId": "TRUCK-001",
+  "truckId": "c4b8f4a4-0b12-4e87-96d7-6f0f1b7c4d6a",
   "startKm": 100.0,
   "endKm": 125.0,
   "pickupLocation": "A",
@@ -170,11 +165,65 @@ Create and update payload:
 }
 ```
 
+`truckId` is optional when creating a trip. When omitted, the API uses the authenticated
+driver's active current assignment; creating without a truck ID and without an assignment is
+rejected. For compatibility with manual entry, a registration number can also be supplied in
+the `truckId` string. Updates retain the existing truck when `truckId` is omitted. A selected
+truck must be active unless an update is retaining the trip's existing retired truck.
+
 `endKm` must be greater than `startKm`. `distanceKm` is always derived by the server as
 `endKm - startKm`; clients cannot set it. `bolNumber` and `notes` are optional. Responses also
-include the server-managed `id`, `driverId`, `createdAtUtc`, `updatedAtUtc`, and integer `version`.
+include the server-managed `id`, `driverId`, `truckId` (stable `Guid`), `truckRegistrationNumber`,
+`createdAtUtc`, `updatedAtUtc`, and integer `version`. A trip retains its truck ID after current
+driver assignments change or a truck is retired.
 The previous `startTime`, `endTime`, and client-provided `distanceKm` fields are intentionally
 removed from the contract.
+
+### Trucks and assignments (JWT required)
+
+Truck list/get operations are available to authenticated drivers and admins:
+
+- `GET /api/trucks`
+  - Returns active trucks for drivers and admins.
+  - Admins may use `?includeRetired=true` to include retired trucks. Drivers receive `403` for
+    that query.
+- `GET /api/trucks/{id}`
+  - Returns an active truck to a driver; admins may also retrieve retired trucks.
+- `GET /api/trucks/me`
+  - Returns the authenticated driver's active current truck, or `404` when unassigned.
+  - `GET /api/trucks/my-assignment` and `GET /api/drivers/me/truck` are equivalent aliases.
+
+Only admins may change truck data:
+
+- `POST /api/trucks` with `{ "registrationNumber": "TRUCK-001", "make": "Volvo", "model": "FH" }`.
+- `PUT /api/trucks/{id}` with the same fields and optional `isActive` to restore/retire.
+- `POST /api/trucks/{id}/retire` soft-retires a truck and clears its current assignment.
+- `DELETE /api/trucks/{id}` is a soft-retire alias that returns `204`.
+- `PUT /api/trucks/assignments/{driverId}` with `{ "truckId": "<truck-guid>" }` assigns a truck;
+  `{ "truckId": null }` clears it. `DELETE /api/trucks/assignments/{driverId}` also clears it.
+- `PUT /api/trucks/{truckId}/assignment` with `{ "driverId": "<driver-id>" }` and
+  `DELETE /api/trucks/{truckId}/assignment` are equivalent truck-oriented assignment routes.
+
+Truck responses are raw JSON objects (not wrapped) with this shape:
+
+```json
+{
+  "id": "c4b8f4a4-0b12-4e87-96d7-6f0f1b7c4d6a",
+  "registrationNumber": "TRUCK-001",
+  "make": "Volvo",
+  "model": "FH",
+  "isActive": true,
+  "retiredAtUtc": null,
+  "assignedDriverId": "identity-user-id",
+  "assignedDriverName": "Driver Name",
+  "createdAtUtc": "2026-09-26T07:30:00Z",
+  "updatedAtUtc": "2026-09-26T07:30:00Z"
+}
+```
+
+Registration numbers are trimmed and normalized to uppercase before uniqueness checks. A truck
+can have at most one current driver, and assigning a truck replaces any current assignment on
+both the driver and truck sides. Retired trucks cannot be assigned or selected for new trips.
 
 ## Frontend integration
 

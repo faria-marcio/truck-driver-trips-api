@@ -96,14 +96,13 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<ITripService, TripService>();
 builder.Services.AddHttpClient<ICitySearchService, GeoapifyCitySearchService>(client =>
 {
     client.BaseAddress = new Uri("https://api.geoapify.com/");
     client.Timeout = TimeSpan.FromSeconds(10);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckDriverTrips/1.0");
 });
-builder.Services.AddScoped<ITripService, TripService>();
-builder.Services.AddScoped<ITruckService, TruckService>();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
