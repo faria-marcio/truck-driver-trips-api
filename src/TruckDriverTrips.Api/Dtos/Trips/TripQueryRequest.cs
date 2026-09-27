@@ -8,8 +8,6 @@ public sealed record TripQueryRequest
     public DateOnly? From { get; init; }
 
     public DateOnly? To { get; init; }
-
-    /// <summary>Accepts either a truck Guid or its registration number.</summary>
     [MaxLength(100)]
     public string? TruckId { get; init; }
 

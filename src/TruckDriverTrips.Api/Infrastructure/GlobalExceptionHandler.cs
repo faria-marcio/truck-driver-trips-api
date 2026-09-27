@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using TruckDriverTrips.Api.Services;
 
 namespace TruckDriverTrips.Api.Infrastructure;
 
@@ -16,11 +17,17 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
     {
         _logger.LogError(exception, "Unhandled exception.");
 
+        var isGeoapifyFailure = exception is GeoapifyServiceException;
+        var statusCode = isGeoapifyFailure
+            ? StatusCodes.Status503ServiceUnavailable
+            : StatusCodes.Status500InternalServerError;
         var problemDetails = new ProblemDetails
         {
-            Status = StatusCodes.Status500InternalServerError,
-            Title = "An unexpected error occurred.",
-            Type = "https://httpstatuses.com/500",
+            Status = statusCode,
+            Title = isGeoapifyFailure
+                ? "The city search service is temporarily unavailable."
+                : "An unexpected error occurred.",
+            Type = $"https://httpstatuses.com/{statusCode}",
             Instance = httpContext.Request.Path
         };
 

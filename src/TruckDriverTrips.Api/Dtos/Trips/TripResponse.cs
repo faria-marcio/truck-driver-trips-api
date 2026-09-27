@@ -1,9 +1,13 @@
 namespace TruckDriverTrips.Api.Dtos.Trips;
 
+/// <summary>Represents a trip with server-managed ownership, distance, timestamps, and version.</summary>
 /// <summary>Represents a trip with stable truck identity, ownership, distance, timestamps, and version.</summary>
 public sealed record TripResponse(
     Guid Id,
     DateOnly Date,
+    string TruckId,
+    decimal StartKm,
+    decimal EndKm,
     Guid TruckId,
     string TruckRegistrationNumber,
     decimal StartKm,

@@ -16,11 +16,7 @@ public sealed class TripService : ITripService
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<TripResponse>> GetTripsAsync(
-        TripQueryRequest query,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TripResponse>> GetTripsAsync(TripQueryRequest query, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         IQueryable<Trip> tripsQuery = BuildAuthorizedQuery(query, currentUserId, isAdmin)
             .OrderByDescending(x => x.Date)
@@ -41,11 +37,7 @@ public sealed class TripService : ITripService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TripResponse?> GetTripAsync(
-        Guid id,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<TripResponse?> GetTripAsync(Guid id, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var trip = await BuildAuthorizedQuery(
                 new TripQueryRequest(),
@@ -58,42 +50,23 @@ public sealed class TripService : ITripService
         return trip;
     }
 
-    public async Task<TripResponse> CreateTripAsync(
-        TripUpsertRequest request,
-        string currentUserId,
-        CancellationToken cancellationToken)
+    public async Task<TripResponse> CreateTripAsync(TripUpsertRequest request, string currentUserId, CancellationToken cancellationToken)
     {
-        var truckId = await ResolveTruckIdAsync(
-            request.TruckId,
-            currentUserId,
-            existingTruckId: null,
-            cancellationToken: cancellationToken);
-
         var trip = new Trip
         {
             Id = Guid.NewGuid(),
             DriverId = currentUserId,
-            TruckId = truckId
+            TruckId = request.TruckId.Trim()
         };
 
-        ApplyEditableFields(trip, request, truckId);
+        ApplyEditableFields(trip, request);
         _dbContext.Trips.Add(trip);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return await GetTripAsync(
-                trip.Id,
-                currentUserId,
-                isAdmin: false,
-                cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("The created trip could not be loaded.");
+        return ToResponse(trip);
     }
 
-    public async Task<TripResponse?> UpdateTripAsync(
-        Guid id,
-        TripUpsertRequest request,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<TripResponse?> UpdateTripAsync(Guid id, TripUpsertRequest request, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var trip = await BuildAuthorizedQuery(
                 new TripQueryRequest(),
@@ -107,23 +80,13 @@ public sealed class TripService : ITripService
             return null;
         }
 
-        var truckId = await ResolveTruckIdAsync(
-            request.TruckId,
-            currentUserId,
-            trip.TruckId,
-            cancellationToken);
-
-        ApplyEditableFields(trip, request, truckId);
+        ApplyEditableFields(trip, request);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return await GetTripAsync(id, currentUserId, isAdmin, cancellationToken);
+        return ToResponse(trip);
     }
 
-    public async Task<bool> DeleteTripAsync(
-        Guid id,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<bool> DeleteTripAsync(Guid id, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var trip = await BuildAuthorizedQuery(
                 new TripQueryRequest(),
@@ -142,11 +105,7 @@ public sealed class TripService : ITripService
         return true;
     }
 
-    public async Task<TripSummaryResponse> GetSummaryAsync(
-        TripQueryRequest query,
-        string currentUserId,
-        bool isAdmin,
-        CancellationToken cancellationToken)
+    public async Task<TripSummaryResponse> GetSummaryAsync(TripQueryRequest query, string currentUserId, bool isAdmin, CancellationToken cancellationToken)
     {
         var aggregate = await BuildAuthorizedQuery(query, currentUserId, isAdmin)
             .GroupBy(_ => 1)
@@ -174,11 +133,7 @@ public sealed class TripService : ITripService
             commissionPerKm);
     }
 
-    private IQueryable<Trip> BuildAuthorizedQuery(
-        TripQueryRequest query,
-        string currentUserId,
-        bool isAdmin,
-        bool trackEntities = false)
+    private IQueryable<Trip> BuildAuthorizedQuery(TripQueryRequest query, string currentUserId, bool isAdmin, bool trackEntities = false)
     {
         IQueryable<Trip> trips = _dbContext.Trips;
         if (!trackEntities)
@@ -203,81 +158,17 @@ public sealed class TripService : ITripService
 
         if (!string.IsNullOrWhiteSpace(query.TruckId))
         {
-            var truckIdentifier = query.TruckId.Trim();
-            if (Guid.TryParse(truckIdentifier, out var truckId))
-            {
+            var truckId = query.TruckId.Trim();
             trips = trips.Where(x => x.TruckId == truckId);
-        }
-            else
-            {
-                var registrationNumber = TruckService.NormalizeRegistrationNumber(truckIdentifier);
-                trips = trips.Where(x => x.Truck!.RegistrationNumber == registrationNumber);
-            }
         }
 
         return trips;
     }
 
-    private async Task<Guid> ResolveTruckIdAsync(
-        string? truckIdentifier,
-        string currentUserId,
-        Guid? existingTruckId,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(truckIdentifier))
-        {
-            if (existingTruckId.HasValue)
-            {
-                return existingTruckId.Value;
-            }
-
-            var assignedTruckId = await _dbContext.Trucks
-                .Where(x => x.AssignedDriverId == currentUserId && x.IsActive)
-                .Select(x => (Guid?)x.Id)
-                .SingleOrDefaultAsync(cancellationToken);
-
-            return assignedTruckId
-                ?? throw new TripValidationException(
-                    "TruckId is required when the authenticated driver has no active truck assignment.");
-        }
-
-        var trimmedIdentifier = truckIdentifier.Trim();
-        Truck? truck;
-        if (Guid.TryParse(trimmedIdentifier, out var truckId))
-        {
-            truck = await _dbContext.Trucks
-                .SingleOrDefaultAsync(x => x.Id == truckId, cancellationToken);
-        }
-        else
-        {
-            var registrationNumber = TruckService.NormalizeRegistrationNumber(trimmedIdentifier);
-            truck = await _dbContext.Trucks
-                .SingleOrDefaultAsync(
-                    x => x.RegistrationNumber == registrationNumber,
-                    cancellationToken);
-        }
-
-        if (truck is null)
-        {
-            throw new TripValidationException(
-                $"TruckId '{trimmedIdentifier}' does not identify an existing truck.");
-        }
-
-        if (!truck.IsActive && truck.Id != existingTruckId)
-        {
-            throw new TripConflictException("A retired truck cannot be used for a new trip assignment.");
-        }
-
-        return truck.Id;
-    }
-
-    private static void ApplyEditableFields(
-        Trip trip,
-        TripUpsertRequest request,
-        Guid truckId)
+    private static void ApplyEditableFields(Trip trip, TripUpsertRequest request)
     {
         trip.Date = request.Date!.Value;
-        trip.TruckId = truckId;
+        trip.TruckId = request.TruckId.Trim();
         trip.StartKm = request.StartKm;
         trip.EndKm = request.EndKm;
         trip.DistanceKm = request.EndKm - request.StartKm;
@@ -298,7 +189,6 @@ public sealed class TripService : ITripService
         x.Id,
         x.Date,
         x.TruckId,
-        x.Truck!.RegistrationNumber,
         x.StartKm,
         x.EndKm,
         x.DistanceKm,
@@ -313,20 +203,23 @@ public sealed class TripService : ITripService
         x.CreatedAtUtc,
         x.UpdatedAtUtc,
         x.Version);
-}
 
-public sealed class TripValidationException : Exception
-{
-    public TripValidationException(string message)
-        : base(message)
-    {
-    }
-}
-
-public sealed class TripConflictException : Exception
-{
-    public TripConflictException(string message)
-        : base(message)
-    {
-    }
+    private static TripResponse ToResponse(Trip trip) => new(
+        trip.Id,
+        trip.Date,
+        trip.TruckId,
+        trip.StartKm,
+        trip.EndKm,
+        trip.DistanceKm,
+        trip.PickupLocation,
+        trip.DropoffLocation,
+        trip.CommissionAmount,
+        trip.BolNumber,
+        trip.FuelCostAmount,
+        trip.WaitTimeMinutes,
+        trip.Notes,
+        trip.DriverId,
+        trip.CreatedAtUtc,
+        trip.UpdatedAtUtc,
+        trip.Version);
 }
